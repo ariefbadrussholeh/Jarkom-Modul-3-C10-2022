@@ -293,27 +293,99 @@ lalu restart node Eden pada GNS3
 SSS, Garden, dan Eden digunakan sebagai client Proxy agar pertukaran informasi dapat terjamin keamanannya, juga untuk mencegah kebocoran data.
 
 Pada Proxy Server di Berlint, Loid berencana untuk mengatur bagaimana Client dapat mengakses internet. Artinya setiap client harus menggunakan Berlint sebagai HTTP & HTTPS proxy. Adapun kriteria pengaturannya adalah sebagai berikut:
+### Proxy Server
+Proxy server yang digunakan adalah Squid. Adapun konfigurasi untuk nomor 1 - 5 adalah sebagai berikut:
+```sh
+apt-get update
+apt-get install squid -y
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+echo "nameserver 192.194.2.2" > /etc/resolve.conf
+echo "http_port 8080
+visible_hostname Berlint
+
+acl WORKDAYS time MTWHF 08:00-17:00
+acl WHITELISTS dstdomain loid-work.com franky-work.com
+acl HTTP_REGEX url_regex ^http:.*$
+
+http_access allow WHITELISTS WORKDAYS
+http_access deny WORKDAYS
+http_access deny HTTP_REGEX
+
+delay_pools 1
+delay_class 1 1
+delay_access 1 deny WORKDAYS
+delay_parameters 1 16000/64000" > /etc/squid/squid.conf
+service squid restart
+service squid status
+```
+### Client Proxy
+```sh
+apt-get update
+apt-get install lynx -y
+apt-get install speedtest-cli -y
+export PYTHONHTTPSVERIFY=0
+export http_proxy="http://192.184.2.3:8080"
+```
 
 ### Soal 1
 
 > Client hanya dapat mengakses internet diluar (selain) hari & jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)
 
+Untuk dapat melakukan pembatasan, pada konfigurasi proxy server ditambahkan http_access deny pada waktu yang disebutkan. Adapun konfigurasinya adalah sebagai berikut:
+```
+acl WORKDAYS time MTWHF 08:00-17:00
+http_access deny WORKDAYS
+```
+
 ### Soal 2
 
 > Adapun pada hari dan jam kerja sesuai nomor (1), client hanya dapat mengakses domain loid-work.com dan franky-work.com (IP tujuan domain dibebaskan)
+
+Berdasarkan tabel, diketahui bahwa pada saat jam kerja hanyalah dua domain yang disebutkan yang dapat diakses, dan dua domain tersebut tidak dapat diakses kecuali pada saat di luar jam kerja. Konfigurasi pada squid adalah sebagai berikut:
+```
+acl WORKDAYS time MTWHF 08:00-17:00
+acl WHITELISTS dstdomain loid-work.com franky-work.com
+http_access allow WHITELISTS WORKDAYS
+```
+Adapun makna dari konfigurasi tersebut adalah memberikan akses http pada kedua domain tersebut DAN pada saat jam kerja
 
 ### Soal 3
 
 > Saat akses internet dibuka, client dilarang untuk mengakses web tanpa HTTPS. (Contoh web HTTP: http://example.com)
 
+Membatasi https dapat dilakukan dengan beberapa cara, yaitu dengan: seleksi regex dan seleksi port. Untuk kasus ini kami menggunakan seleksi regex. Adapun konfigurasi seleksi regex adalah sebagai berikut:
+```
+acl HTTP_REGEX url_regex ^http:.*$
+http_access deny HTTP_REGEX
+```
+
 ### Soal 4
 
 > Agar menghemat penggunaan, akses internet dibatasi dengan kecepatan maksimum 128 Kbps pada setiap host (Kbps = kilobit per second; lakukan pengecekan pada tiap host, ketika 2 host akses internet pada saat bersamaan, keduanya mendapatkan speed maksimal yaitu 128 Kbps)
+
+Pembatasan bandwith dapat dilakukan dengan modul delay pada squid. Adapun konfigurasinya adalah sebagai berikut:
+```
+delay_pools 1
+delay_class 1 1
+delay_access 1 allow all
+delay_parameters 1 16000/64000
+```
+Adapun penjelasan konfigurasi tersebut adalah sebagai berikut. Pada soal disebutkan bahwa bandwith akan dibagikan secara sama rata pada semua user. Didapatkan informasi bahwa:
+1. Hanya terdapat satu jenis user
+2. Bandwith dibagi `sama rata` pada semua user
+Oleh karena itu, dibuat satu delay pool dengan tipe class 1. Selanjutnya bandwith dibatasi sesuai dengan soal yaitu 128 Kbps.
 
 ### Soal 5
 
 > Setelah diterapkan, ternyata peraturan nomor (4) mengganggu produktifitas saat hari kerja, dengan demikian pembatasan kecepatan hanya diberlakukan untuk pengaksesan internet pada hari libur
 
+Pada soal ini, diminta untuk melakukan pembatasan bandwith hanya pada saat selain hari kerja. Oleh karena itu, akses delay pool tidak dberikan kepada semua. Adapun konfigurasi tersebut adalah sebagai berikut:
+```
+acl WORKDAYS time MTWHF 08:00-17:00
+delay_access 1 deny WORKDAYS
+```
+
 ## Kendala
 
 - Sempat terkendala saat mengkonfigurasi DHCP server dengan relay. DHCP Server failed to start. Solusi meng-copy file konfigurasi asli dari pada menggunakan `echo`
+- Terjadi kendala environment `http_proxy` tidak dapat diubah jika ditempatkan di file selain `.bashrc`. Akan tetapi permasalahan dapat diselesaikan dengan menempatkan `export` langsung pada `.bashrc`

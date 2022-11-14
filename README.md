@@ -257,6 +257,25 @@ Agar lama waktu DHCP server meminjamkan alamat IP pada client dapat ditentukan, 
 
 > Loid dan Franky berencana menjadikan Eden sebagai server untuk pertukaran informasi dengan alamat IP yang tetap dengan IP [prefix IP].3.13
 
+1. langkah pertama: masuk ke dhcp server di westalis dan masukan code berikut ke /etc/dhcp/dhcpd.conf
+
+```
+host Eden{
+	hardware ethernet 16:e1:35:75:f0:e4;
+	fixed-address 192.184.3.13;
+}
+```
+
+lalu restart isc-dhcp-server
+
+2. langkah kedua: masuk ke Eden dan masukan code berikut ke /etc/network/interfaces
+
+```
+	hwaddress ether 16:e1:35:75:f0:e4
+```
+
+lalu restart node Eden pada GNS3
+
 ### Testing
 
 - IP masing-masing client
